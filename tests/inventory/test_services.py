@@ -63,6 +63,30 @@ def test_update_inventory_revalidates_metadata(inventory, metadata):
 
 
 @pytest.mark.django_db
+def test_changing_type_revalidates_the_stored_metadata(inventory, monkeypatch):
+    """A type with a stricter schema must not inherit metadata it would reject."""
+    from interview.inventory.models import InventoryType
+    from interview.inventory.schemas import InventoryMetaData, metadata_registry
+
+    class EpisodeMetadata(InventoryMetaData):
+        season: int
+
+    monkeypatch.setattr(metadata_registry, "_schemas", {"episode": EpisodeMetadata})
+    episode = InventoryType.objects.create(name="Episode")
+
+    with pytest.raises(InvalidMetadataError):
+        services.update_inventory(inventory, type=episode)
+
+    inventory.refresh_from_db()
+    assert inventory.type.name == "Movie"
+
+    services.update_inventory(inventory, type=episode, metadata={**inventory.metadata, "season": 2})
+    inventory.refresh_from_db()
+    assert inventory.type == episode
+    assert inventory.metadata["season"] == 2
+
+
+@pytest.mark.django_db
 def test_update_inventory_replaces_tags(inventory, inventory_tag):
     from interview.inventory.models import InventoryTag
 

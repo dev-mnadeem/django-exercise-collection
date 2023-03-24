@@ -56,15 +56,16 @@ def create_inventory(
 def update_inventory(inventory: Inventory, **fields) -> Inventory:
     """Partially update an inventory item.
 
-    Metadata, when supplied, is re-validated against the schema for the item's
-    (possibly new) type rather than being written through blindly.
+    Metadata is validated against the schema for the item's (possibly new)
+    type whenever either changes: a new type can register a stricter schema
+    than the metadata already stored was checked against.
     """
     tags = fields.pop("tags", None)
 
-    if "metadata" in fields:
+    if "metadata" in fields or "type" in fields:
         inventory_type = fields.get("type", inventory.type)
         fields["metadata"] = metadata_registry.validate(
-            _type_name(inventory_type), fields["metadata"]
+            _type_name(inventory_type), fields.get("metadata", inventory.metadata)
         )
 
     for field, value in fields.items():
