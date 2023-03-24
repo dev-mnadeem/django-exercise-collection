@@ -35,6 +35,27 @@ def test_deactivating_twice_is_a_no_op(order):
     assert order.is_active is False
 
 
+def test_changing_the_state_moves_updated_at(order):
+    stale = order.updated_at - timedelta(days=1)
+    Order.objects.filter(pk=order.pk).update(updated_at=stale)
+    order.refresh_from_db()
+
+    services.deactivate_order(order)
+
+    order.refresh_from_db()
+    assert order.updated_at > stale
+
+
+def test_a_no_op_leaves_updated_at_alone(make_order):
+    order = make_order(is_active=False)
+    before = order.updated_at
+
+    services.deactivate_order(order)
+
+    order.refresh_from_db()
+    assert order.updated_at == before
+
+
 def test_create_order(inventory, order_tag):
     today = date.today()
 

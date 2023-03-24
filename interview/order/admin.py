@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils import timezone
 
 from interview.order.models import Order, OrderTag
 
@@ -25,10 +26,10 @@ class OrderAdmin(admin.ModelAdmin):
 
     @admin.action(description="Deactivate selected orders")
     def deactivate_selected(self, request, queryset):
-        updated = queryset.update(is_active=False)
+        updated = queryset.update(is_active=False, updated_at=timezone.now())
         self.message_user(request, f"{updated} order(s) deactivated.")
 
     @admin.action(description="Activate selected orders")
     def activate_selected(self, request, queryset):
-        updated = queryset.update(is_active=True)
+        updated = queryset.update(is_active=True, updated_at=timezone.now())
         self.message_user(request, f"{updated} order(s) activated.")

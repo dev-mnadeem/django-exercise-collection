@@ -20,8 +20,10 @@ def set_order_active(order: Order, *, is_active: bool) -> Order:
     error, so a retried request cannot fail spuriously.
     """
     if order.is_active != is_active:
-        Order.set_active(order.pk, is_active=is_active)
-        order.refresh_from_db(fields=["is_active", "updated_at"])
+        order.is_active = is_active
+        # save() rather than QuerySet.update(): only save() honours auto_now,
+        # so this is what moves updated_at.
+        order.save(update_fields=["is_active", "updated_at"])
         logger.info("Order %s is_active -> %s", order.pk, is_active)
     return order
 
