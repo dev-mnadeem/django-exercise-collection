@@ -113,6 +113,33 @@ def test_list_filters_by_created_after(api_client, make_inventory):
     assert [row["name"] for row in response.json()["results"]] == ["New"]
 
 
+@pytest.mark.parametrize("param", ["type", "language"])
+@pytest.mark.parametrize("raw", ["abc", "-1", "0", "1.5"])
+def test_list_rejects_a_non_numeric_id_filter_with_400(api_client, make_inventory, param, raw):
+    """These used to reach the ORM and come back as a 500."""
+    make_inventory()
+
+    response = api_client.get(reverse("inventory:inventory-list"), {param: raw})
+
+    assert response.status_code == 400
+    assert param in response.json()
+
+
+def test_list_filters_by_type_and_language(api_client, make_inventory, inventory_type):
+    other_type = InventoryType.objects.create(name="Episode")
+    other_language = InventoryLanguage.objects.create(name="French")
+    make_inventory(name="Movie in English")
+    make_inventory(name="Episode in French", type=other_type, language=other_language)
+
+    by_type = api_client.get(reverse("inventory:inventory-list"), {"type": other_type.id})
+    by_language = api_client.get(
+        reverse("inventory:inventory-list"), {"language": other_language.id}
+    )
+
+    assert [row["name"] for row in by_type.json()["results"]] == ["Episode in French"]
+    assert [row["name"] for row in by_language.json()["results"]] == ["Episode in French"]
+
+
 def test_created_after_endpoint(api_client, make_inventory):
     old = make_inventory(name="Old")
     make_inventory(name="New")

@@ -51,6 +51,19 @@ def parse_date_param(raw: str | None, *, field: str) -> date | None:
         ) from exc
 
 
+def parse_id_param(raw: str | int | None, *, field: str) -> int | None:
+    """Parse a positive integer id query parameter, or ``None`` when absent.
+
+    A non-numeric value would otherwise reach the ORM and surface as a 500.
+    """
+    value = "" if raw is None else str(raw).strip()
+    if not value:
+        return None
+    if not value.isdigit() or int(value) < 1:
+        raise InvalidFilterError({field: f"Expected a positive integer id, got {raw!r}."})
+    return int(value)
+
+
 def inventory_created_after(after: date, *, queryset: QuerySet[Inventory] | None = None):
     """Inventory created strictly after the end of the given day.
 
@@ -73,12 +86,12 @@ def filtered_inventory(params) -> QuerySet[Inventory]:
     if created_after is not None:
         qs = inventory_created_after(created_after, queryset=qs)
 
-    type_id = params.get("type")
-    if type_id:
+    type_id = parse_id_param(params.get("type"), field="type")
+    if type_id is not None:
         qs = qs.filter(type_id=type_id)
 
-    language_id = params.get("language")
-    if language_id:
+    language_id = parse_id_param(params.get("language"), field="language")
+    if language_id is not None:
         qs = qs.filter(language_id=language_id)
 
     return qs

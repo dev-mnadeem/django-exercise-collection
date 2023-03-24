@@ -75,3 +75,18 @@ def test_filtered_inventory_narrows_by_type(make_inventory, inventory_type):
 def _set_created_at(instance, when: datetime) -> None:
     """`auto_now_add` ignores assignment, so write the column directly."""
     type(instance).objects.filter(pk=instance.pk).update(created_at=when)
+
+
+def test_parse_id_param_accepts_a_positive_integer():
+    assert selectors.parse_id_param(" 42 ", field="type") == 42
+
+
+def test_parse_id_param_returns_none_when_absent():
+    assert selectors.parse_id_param(None, field="type") is None
+    assert selectors.parse_id_param("", field="type") is None
+
+
+@pytest.mark.parametrize("raw", ["abc", "-3", "0", "4.2"])
+def test_parse_id_param_rejects_junk(raw):
+    with pytest.raises(InvalidFilterError):
+        selectors.parse_id_param(raw, field="type")
