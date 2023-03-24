@@ -29,7 +29,7 @@ def test_film_locations_defaults_to_empty(valid_payload):
 
 
 def test_validated_metadata_is_json_serialisable(valid_payload):
-    """The Decimal that `.dict()` leaves behind is what JSONField rejects."""
+    """The Decimal a plain `model_dump()` leaves behind is what JSONField rejects."""
     import json
 
     result = metadata_registry.validate("Movie", valid_payload)
@@ -45,6 +45,30 @@ def test_misspelled_key_is_rejected(valid_payload):
 
     with pytest.raises(InvalidMetadataError):
         metadata_registry.validate("Movie", payload)
+
+
+def test_errors_name_each_bad_key_and_are_json_serialisable(valid_payload):
+    import json
+
+    payload = {**valid_payload}
+    payload["rotten_toamtoes_rating"] = payload.pop("rotten_tomatoes_rating")
+
+    with pytest.raises(InvalidMetadataError) as caught:
+        metadata_registry.validate("Movie", payload)
+
+    errors = caught.value.detail["metadata"]
+    assert {(tuple(e["loc"]), str(e["type"])) for e in errors} == {
+        (("rotten_tomatoes_rating",), "missing"),
+        (("rotten_toamtoes_rating",), "extra_forbidden"),
+    }
+    json.dumps(caught.value.get_full_details())  # must not raise
+
+
+def test_rating_keeps_its_exact_value(valid_payload):
+    """Validated as a Decimal, stored as the same JSON number, not a string."""
+    result = metadata_registry.validate("Movie", {**valid_payload, "imdb_rating": "7.25"})
+
+    assert result["imdb_rating"] == 7.25
 
 
 def test_missing_required_field_is_rejected(valid_payload):

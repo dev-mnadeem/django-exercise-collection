@@ -10,8 +10,7 @@ This module is the seam that stops it. One schema is registered per inventory
 type name; validation happens on the way in. Adding a type-specific shape is a
 two-line change and requires touching neither the service nor the view:
 
-    from pydantic import BaseModel
-    from interview.inventory.metadata import metadata_registry
+    from interview.inventory.schemas import InventoryMetaData, metadata_registry
 
     class EpisodeMetadata(InventoryMetaData):
         season: int
@@ -24,13 +23,16 @@ Anything not explicitly registered validates against the default schema.
 
 from __future__ import annotations
 
-import json
 from decimal import Decimal
-from typing import Type
+from typing import Annotated, Type
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ConfigDict, PlainSerializer, ValidationError
 
 from interview.core.exceptions import InvalidMetadataError
+
+# Validated exactly as a Decimal, stored as a JSON number. Pydantic 2 renders a
+# Decimal as a *string* in JSON mode, which would change the stored shape.
+Rating = Annotated[Decimal, PlainSerializer(float, return_type=float, when_used="json")]
 
 
 class InventoryMetaData(BaseModel):
@@ -40,14 +42,13 @@ class InventoryMetaData(BaseModel):
     the field existed continue to validate.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     year: int
     actors: list[str]
-    imdb_rating: Decimal
+    imdb_rating: Rating
     rotten_tomatoes_rating: int
     film_locations: list[str] = []
-
-    class Config:
-        extra = "forbid"
 
 
 class MetadataSchemaRegistry:
@@ -79,16 +80,15 @@ class MetadataSchemaRegistry:
 
         schema = self.schema_for(type_name)
         try:
-            model = schema(**payload)
+            model = schema.model_validate(payload)
         except ValidationError as exc:
-            raise InvalidMetadataError({"metadata": exc.errors()}) from exc
-        except TypeError as exc:
-            raise InvalidMetadataError({"metadata": str(exc)}) from exc
+            errors = exc.errors(include_url=False, include_context=False, include_input=False)
+            raise InvalidMetadataError({"metadata": errors}) from exc
 
-        # Round-trip through pydantic's JSON encoder. ``.dict()`` alone leaves
-        # a Decimal in place, which ``JSONField`` cannot store -- the original
-        # cause of every POST /inventory/ returning 400.
-        return json.loads(model.json())
+        # JSON mode, not a plain dump: a plain dump leaves a Decimal in place,
+        # which ``JSONField`` cannot store -- the original cause of every
+        # POST /inventory/ returning 400.
+        return model.model_dump(mode="json")
 
 
 metadata_registry = MetadataSchemaRegistry(default=InventoryMetaData)

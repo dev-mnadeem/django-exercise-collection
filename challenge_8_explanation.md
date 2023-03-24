@@ -118,12 +118,17 @@ straight back. `json.dumps` cannot serialise a `Decimal` — it raises
 `TypeError` — and DRF catches that and reports it as "Value must be valid
 JSON". The validation you added is what broke the write.
 
-Round-trip through pydantic's own JSON encoder instead, which knows to render
-a `Decimal` as a number:
+Ask pydantic for a JSON-mode dump instead, which converts every value to
+something JSON can hold:
 
 ```python
-return json.loads(model.json())   # {"imdb_rating": 8.8, ...} — plain floats
+return model.model_dump(mode="json")   # {"imdb_rating": 8.8, ...}
 ```
+
+(The original code used pydantic 1, where `.dict()` and `.json()` were the
+names; the project now runs pydantic 2. Pydantic 2's JSON mode renders a
+`Decimal` as the *string* `"8.8"` by default, so the schema declares the rating
+with a serializer that emits a float — see the next section.)
 
 This is the general lesson worth taking away: **validating a value and
 serialising it are different operations.** A validator is entitled to give you
@@ -164,25 +169,27 @@ Add it to the schema with a default, so the rows already in the database —
 which predate the field — keep validating:
 
 ```python
+Rating = Annotated[Decimal, PlainSerializer(float, return_type=float, when_used="json")]
+
+
 class InventoryMetaData(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     year: int
     actors: list[str]
-    imdb_rating: Decimal
+    imdb_rating: Rating
     rotten_tomatoes_rating: int
     film_locations: list[str] = []
-
-    class Config:
-        extra = "forbid"
 ```
 
-`extra = "forbid"` is the part that earns its keep. This repository's own seed
+`extra="forbid"` is the part that earns its keep. This repository's own seed
 data contained `rotten_toamtoes_rating` — a transposition in "tomatoes" that
 sat in the fixture unnoticed. Without `forbid`, pydantic drops the unknown key
 silently and stores a row missing its rating; with it you get:
 
 ```json
-{"metadata":[{"loc":["rotten_tomatoes_rating"],"msg":"field required","type":"value_error.missing"},
-             {"loc":["rotten_toamtoes_rating"],"msg":"extra fields not permitted","type":"value_error.extra"}]}
+{"metadata":[{"type":"missing","loc":["rotten_tomatoes_rating"],"msg":"Field required"},
+             {"type":"extra_forbidden","loc":["rotten_toamtoes_rating"],"msg":"Extra inputs are not permitted"}]}
 ```
 
 A `JSONField` will accept any shape you give it, so the schema is the only
