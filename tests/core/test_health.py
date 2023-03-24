@@ -35,3 +35,18 @@ def test_healthz_needs_no_credentials(api_client):
     from rest_framework.permissions import AllowAny
 
     assert HealthCheckView.permission_classes == [AllowAny]
+
+
+@pytest.mark.django_db
+def test_healthz_is_not_redirected_to_https_in_production(client, settings, monkeypatch):
+    """The plain-HTTP container probe must reach the view, not a 301."""
+    import importlib
+
+    monkeypatch.setenv("DJANGO_SECRET_KEY", "test-only-key")
+    monkeypatch.setenv("DJANGO_ALLOWED_HOSTS", "localhost")
+    production = importlib.reload(importlib.import_module("config.settings.production"))
+    settings.SECURE_SSL_REDIRECT = production.SECURE_SSL_REDIRECT
+    settings.SECURE_REDIRECT_EXEMPT = production.SECURE_REDIRECT_EXEMPT
+
+    assert client.get("/healthz/").status_code == 200
+    assert client.get("/inventory/").status_code == 301

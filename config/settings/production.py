@@ -29,6 +29,10 @@ REST_FRAMEWORK = {
 # Transport and cookie hardening. Disable SSL redirect only when TLS is
 # terminated by a proxy that already enforces it.
 SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", default=True)
+# The container HEALTHCHECK probes over plain HTTP from inside the container.
+# Redirected, it would get a 301, which curl counts as success without the
+# database check ever running.
+SECURE_REDIRECT_EXEMPT = [r"^healthz/$"]
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_HSTS_SECONDS = 60 * 60 * 24 * 365
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
