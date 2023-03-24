@@ -1,5 +1,6 @@
-# Development-only tooling. The challenge brief forbids adding packages "to
-# complete the work"; these add no runtime dependency and exist only to prove
-# the brief's own requirement that the code be "free of basic linting errors".
+# Test and lint tooling. Nothing in the application imports these.
 -r requirements.txt
-flake8==6.0.0
+black==26.10.1
+flake8==7.5.0
+pytest==9.2.0
+pytest-django==4.14.0
