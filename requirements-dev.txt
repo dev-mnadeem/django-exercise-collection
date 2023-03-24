@@ -1,0 +1,5 @@
+# Development-only tooling. The challenge brief forbids adding packages "to
+# complete the work"; these add no runtime dependency and exist only to prove
+# the brief's own requirement that the code be "free of basic linting errors".
+-r requirements.txt
+flake8==6.0.0
