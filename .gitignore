@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Virtualenvs
+.venv/
+venv/
+env/
+project_venv/
+
+# Environment and secrets -- never commit these
+.env
+.env.*
+!.env.example
+
+# Local database and generated artefacts
+*.sqlite3
+db.sqlite3
+/staticfiles/
+/media/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
