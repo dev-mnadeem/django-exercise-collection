@@ -1,4 +1,4 @@
-# TMT Inventory & Orders API
+# Licensing Inventory & Orders API
 
 A Django REST Framework service for a media-licensing catalogue. **Inventory**
 items — films, episodes and versions, each carrying a free-form metadata blob —
@@ -93,24 +93,39 @@ request/response pairs for all eight challenges are in
 
 ## Running it
 
-With `POSTGRES_DB` unset the project uses SQLite, so nothing else need be
-running:
+Two paths, both starting from a clone. Use **Python 3.12** (pinned in
+`.python-version`).
+
+**Local virtualenv.** With `POSTGRES_DB` unset the project uses SQLite, so
+nothing else need be running:
 
 ```bash
 ./start.sh                             # venv, dependencies, migrate, seed
 source .venv/bin/activate
 python manage.py runserver             # http://127.0.0.1:8000/inventory/
-pytest                                 # 135 tests, SQLite, no services needed
+pytest                                 # 160 tests, SQLite, no services needed
 python manage.py seed_demo_data        # idempotent: 17 inventory items, 5 orders
 black --check . && flake8 .            # line length 100
 ```
 
-On Windows, run `start.bat` and activate with `.venv\Scripts\Activate.ps1`. For
-PostgreSQL, `docker compose --file docker-compose.dev.yml up -d` and copy
-`.env.example` to `.env` before `./start.sh`; for the whole stack, export a
-`DJANGO_SECRET_KEY` and `docker compose up --build`, which serves on port 8960.
-Use **Python 3.11** — `requirements.txt` pins `pydantic` 1.10.6 and `Pillow`
-9.5.0, neither of which has wheels for 3.12+.
+On Windows, run `start.bat` and activate with `.venv\Scripts\Activate.ps1`. To
+use PostgreSQL instead, `docker compose --file docker-compose.dev.yml up -d`
+and copy `.env.example` to `.env` before `./start.sh`.
+
+**Whole stack in Docker.** gunicorn on `config.settings.production` plus
+PostgreSQL 17:
+
+```bash
+cp .env.example .env                   # then put a key in DJANGO_SECRET_KEY
+docker compose up --build -d --wait    # API on http://localhost:8960
+docker compose exec api python manage.py seed_demo_data
+docker compose exec api python manage.py createsuperuser
+curl -u you@example.com:your-password http://localhost:8960/inventory/
+```
+
+Production settings serve JSON only and require an authenticated user (session
+or HTTP Basic), so the `createsuperuser` step is what makes the API answer;
+`/healthz/` stays open for the container healthcheck.
 
 ## Creating an inventory item
 
@@ -150,8 +165,8 @@ configurations against the same data — captured runs in
 
 | Endpoint | Without eager loading | With eager loading |
 | --- | --- | --- |
-| `GET /inventory/` | 301 queries, 43.1 ms | **2 queries, 8.5 ms** |
-| `GET /orders/` | 501 queries, 70.0 ms | **3 queries, 23.5 ms** |
+| `GET /inventory/` | 301 queries, 50.1 ms | **2 queries, 9.5 ms** |
+| `GET /orders/` | 501 queries, 85.5 ms | **3 queries, 32.1 ms** |
 
 *500 rows, 100 per page, SQLite. Query counts are engine-independent, the
 milliseconds are not.*
@@ -181,7 +196,7 @@ interview/core/      Shared plumbing, no domain models: behaviours, pagination,
 interview/inventory/ The catalogue, and the metadata schema registry.
 interview/order/     Licensing windows, activation, tag relations.
 interview/profiles/  UserProfile, the project's AUTH_USER_MODEL.
-tests/               135 tests mirroring the app layout.
+tests/               160 tests mirroring the app layout.
 ```
 
 Within an app, `views.py` deserialises, delegates and serialises,
@@ -203,12 +218,12 @@ back. `POSTGRES_DB` switches the engine from SQLite to PostgreSQL. No settings
 module contains a literal key or password, and `tests/test_settings.py` fails
 the build if one reappears.
 
-The brief says *"do not add any other packages to this project"*, so
-`requirements.txt` is unchanged. Two files sit outside it, neither needed to run
-the challenges: `requirements-dev.txt` adds **flake8**, enforcing the brief's
-own requirement that the code be free of basic linting errors, and
-`requirements-prod.txt` adds **gunicorn** for the container. No application
-module imports either.
+Dependencies come in three files. `requirements.txt` is what the application
+imports: Django 5.2 LTS, Django REST Framework, pydantic 2 for the metadata
+schemas, Pillow for avatar images, psycopg2 and python-dotenv.
+`requirements-dev.txt` adds pytest, black and flake8, and
+`requirements-prod.txt` adds gunicorn for the container. Neither extra file is
+imported by any application module, and the image installs only the prod set.
 
 ## Judgement calls worth arguing with
 
@@ -231,22 +246,22 @@ module imports either.
   registration, login or token endpoint, only session auth through `/api-auth/`
   and the admin. Permissions are all-or-nothing, with no per-object rules and no
   record of who owns an order, and under `local` the default is `AllowAny`.
-- **`config/asgi.py` still points `DJANGO_SETTINGS_MODULE` at
-  `interview.settings`**, a module that does not exist. Nothing imports the ASGI
-  entrypoint — `runserver` and the container both go through WSGI — but an ASGI
-  deployment would need that line corrected.
-- **No API schema document** — OpenAPI would mean adding `drf-spectacular`,
-  which the brief forbids — and **metadata is validated but not indexed**, so
-  filtering on a field inside it is a full scan.
-- **The Docker images have not been built or booted.** The `Dockerfile` is
-  two-stage with a non-root user and a real `HEALTHCHECK`, and both compose
-  files pass `docker compose config`, but no image has been produced. By the
-  same token `config.settings.production` has never run against a deployment.
-- **Django 4.1 stopped receiving security patches in December 2023**, but the
-  pin is the brief's, not a choice.
+- **No API schema document** — there is no OpenAPI generator installed — and
+  **metadata is validated but not indexed**, so filtering on a field inside it
+  is a full scan.
+- **The container has run locally, never in a real deployment.** The image is
+  two-stage with a non-root user; `docker compose up --build` boots it against
+  PostgreSQL 17, its `HEALTHCHECK` reports healthy, and the requests in
+  `docs/api-transcript.txt` were captured from that stack. TLS termination,
+  static file serving behind a proxy and secrets management are left to
+  whatever hosts it.
 
 ![The order admin changelist, with one of the five seeded orders deactivated](docs/screenshots/admin-orders.png)
 
-Two further captures, both 1440x900 like the others and taken against a local
-seeded server: the [inventory changelist](docs/screenshots/admin-inventory.png)
+Two further captures, both 1440x900 like the others and taken against a
+seeded development server: the [inventory changelist](docs/screenshots/admin-inventory.png)
 and the [orders-by-tag endpoint](docs/screenshots/browsable-orders-by-tag.png).
+
+## Licence
+
+MIT; see [`LICENSE`](LICENSE).
