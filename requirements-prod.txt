@@ -1,0 +1,5 @@
+# Runtime additions for a container image. Kept out of requirements.txt so the
+# dependency set the challenge brief pins stays exactly as it was: a WSGI
+# server is deployment plumbing, not a library the application code imports.
+-r requirements.txt
+gunicorn==20.1.0
