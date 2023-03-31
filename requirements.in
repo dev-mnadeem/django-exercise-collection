@@ -1,0 +1,9 @@
+Django>=5.2,<5.3
+djangorestframework>=3.16,<4
+Pillow>=11,<13
+psycopg2-binary>=2.9.10,<3
+pydantic>=1.10.24,<2
+python-dotenv>=1.0,<2
+pytest>=8,<10
+pytest-django>=4.11,<5
+black>=25,<27

@@ -109,8 +109,9 @@ On Windows, run `start.bat` and activate with `.venv\Scripts\Activate.ps1`. For
 PostgreSQL, `docker compose --file docker-compose.dev.yml up -d` and copy
 `.env.example` to `.env` before `./start.sh`; for the whole stack, export a
 `DJANGO_SECRET_KEY` and `docker compose up --build`, which serves on port 8960.
-Use **Python 3.11** — `requirements.txt` pins `pydantic` 1.10.6 and `Pillow`
-9.5.0, neither of which has wheels for 3.12+.
+Use **Python 3.12** for the verified native setup. The dependency lock now uses
+Django 5.2 LTS, current Pillow wheels and the compatible Pydantic 1.10 release.
+Regenerate it with `uv pip compile --upgrade requirements.in -o requirements.txt`.
 
 ## Creating an inventory item
 
@@ -203,19 +204,17 @@ back. `POSTGRES_DB` switches the engine from SQLite to PostgreSQL. No settings
 module contains a literal key or password, and `tests/test_settings.py` fails
 the build if one reappears.
 
-The brief says *"do not add any other packages to this project"*, so
-`requirements.txt` is unchanged. Two files sit outside it, neither needed to run
-the challenges: `requirements-dev.txt` adds **flake8**, enforcing the brief's
-own requirement that the code be free of basic linting errors, and
-`requirements-prod.txt` adds **gunicorn** for the container. No application
-module imports either.
+The original exercise supplied older dependency pins. This maintained version keeps the
+exercise behavior while updating the framework and compatible libraries.
+`requirements.in` records the allowed ranges and `requirements.txt` records the resolved
+versions. `requirements-dev.txt` adds flake8; `requirements-prod.txt` adds the WSGI server.
 
 ## Judgement calls worth arguing with
 
 - **"Between" a start and an embargo date is containment, not overlap.** An
   order qualifies when it both starts no earlier and is embargoed no later than
   the requested window, so orders that merely overlap are excluded. The brief is
-  genuinely ambiguous; the choice is stated in `interview/order/selectors.py`.
+  ambiguous; the choice is stated in `interview/order/selectors.py`.
 - **`is_authenticated` stays a property.** The brief asks for a method, but
   Django defines it as a property and its own middleware reads it as one, so
   making it callable would break `request.user.is_authenticated` project-wide.
@@ -231,10 +230,6 @@ module imports either.
   registration, login or token endpoint, only session auth through `/api-auth/`
   and the admin. Permissions are all-or-nothing, with no per-object rules and no
   record of who owns an order, and under `local` the default is `AllowAny`.
-- **`config/asgi.py` still points `DJANGO_SETTINGS_MODULE` at
-  `interview.settings`**, a module that does not exist. Nothing imports the ASGI
-  entrypoint — `runserver` and the container both go through WSGI — but an ASGI
-  deployment would need that line corrected.
 - **No API schema document** — OpenAPI would mean adding `drf-spectacular`,
   which the brief forbids — and **metadata is validated but not indexed**, so
   filtering on a field inside it is a full scan.
@@ -242,8 +237,10 @@ module imports either.
   two-stage with a non-root user and a real `HEALTHCHECK`, and both compose
   files pass `docker compose config`, but no image has been produced. By the
   same token `config.settings.production` has never run against a deployment.
-- **Django 4.1 stopped receiving security patches in December 2023**, but the
-  pin is the brief's, not a choice.
+- **ASGI and WSGI both import successfully** with `config.settings.local`; set
+  `DJANGO_SETTINGS_MODULE=config.settings.production` explicitly for deployment.
+  The refreshed lock passes all 135 native tests on Python 3.12. Container startup
+  remains unverified on this machine because the Docker daemon is unavailable.
 
 ![The order admin changelist, with one of the five seeded orders deactivated](docs/screenshots/admin-orders.png)
 
