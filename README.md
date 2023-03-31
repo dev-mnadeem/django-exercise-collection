@@ -247,3 +247,7 @@ versions. `requirements-dev.txt` adds flake8; `requirements-prod.txt` adds the W
 Two further captures, both 1440x900 like the others and taken against a local
 seeded server: the [inventory changelist](docs/screenshots/admin-inventory.png)
 and the [orders-by-tag endpoint](docs/screenshots/browsable-orders-by-tag.png).
+
+## Author
+
+[**Muhammad Nadeem**](https://github.com/dev-mnadeem)

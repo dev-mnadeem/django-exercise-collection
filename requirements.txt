@@ -22,7 +22,7 @@ packaging==26.3
     #   pytest
 pathspec==1.1.1
     # via black
-pillow==12.3.0
+pillow==13.0.0
     # via -r requirements.in
 platformdirs==4.13.6
     # via black
