@@ -1,0 +1,28 @@
+# Database only. Run the application itself from a local virtualenv:
+#
+#   docker compose --file docker-compose.dev.yml up -d
+#   ./start.sh
+#
+# Pinned to a major version rather than `latest`, so that a rebuild months
+# from now cannot silently move the database under an existing volume.
+
+services:
+  db:
+    image: postgres:15-alpine
+    ports:
+      - "${POSTGRES_HOST_PORT:-5444}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-docker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-docker}
+      POSTGRES_DB: ${POSTGRES_DB:-tmt_interview}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-docker} -d ${POSTGRES_DB:-tmt_interview}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
+    driver: local

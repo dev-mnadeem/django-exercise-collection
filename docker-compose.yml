@@ -1,0 +1,49 @@
+# Full stack: API plus its database.
+#
+# For a database only -- the setup the challenge brief describes, with the app
+# run from a local virtualenv -- use docker-compose.dev.yml instead.
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-docker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-docker}
+      POSTGRES_DB: ${POSTGRES_DB:-tmt_interview}
+    ports:
+      - "${POSTGRES_HOST_PORT:-5444}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-docker} -d ${POSTGRES_DB:-tmt_interview}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      target: runtime
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      # Supply a real key via a .env file or the shell; the container refuses
+      # to start without one.
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set DJANGO_SECRET_KEY}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      DJANGO_SECURE_SSL_REDIRECT: ${DJANGO_SECURE_SSL_REDIRECT:-0}
+      POSTGRES_DB: ${POSTGRES_DB:-tmt_interview}
+      POSTGRES_USER: ${POSTGRES_USER:-docker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-docker}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+    ports:
+      - "${API_HOST_PORT:-8960}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - media:/app/media
+
+volumes:
+  pgdata:
+  media:

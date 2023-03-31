@@ -1,0 +1,31 @@
+# Version control and CI
+.git
+.github
+.gitignore
+
+# Virtualenvs and caches
+.venv
+venv
+project_venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Local state that must never be baked into an image
+.env
+*.sqlite3
+media/
+staticfiles/
+
+# Documentation and test assets: not needed at runtime
+docs/
+tests/
+README.md
+challenge_8_explanation.md
+
+# Editor noise
+.idea
+.vscode
+.DS_Store
