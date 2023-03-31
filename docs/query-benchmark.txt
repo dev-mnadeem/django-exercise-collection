@@ -1,0 +1,21 @@
+$ ./manage.py benchmark_queries --rows 200 --page-size 25
+rows=200 page_size=25 vendor=sqlite
+
+endpoint              eager     queries        ms
+-------------------------------------------------
+GET /inventory/       yes             2       3.5
+GET /inventory/       no             76      12.3
+GET /orders/          yes             3       4.7
+GET /orders/          no            126      18.4
+Benchmark rows rolled back.
+
+$ ./manage.py benchmark_queries --rows 500 --page-size 100
+rows=500 page_size=100 vendor=sqlite
+
+endpoint              eager     queries        ms
+-------------------------------------------------
+GET /inventory/       yes             2       8.5
+GET /inventory/       no            301      43.1
+GET /orders/          yes             3      23.5
+GET /orders/          no            501      70.0
+Benchmark rows rolled back.

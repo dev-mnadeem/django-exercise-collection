@@ -1,0 +1,172 @@
+Captured against a local development server on 127.0.0.1:8960, seeded with
+`./manage.py seed_demo_data`. Every block below is the literal output of the
+command shown above it.
+
+=============================================================================
+Challenge 5 -- inventory pagination: three items per request, offset/limit
+=============================================================================
+$ curl -s 'http://127.0.0.1:8960/inventory/' | .venv/bin/python -m json.tool | head -20
+{
+    "count": 17,
+    "next": "http://127.0.0.1:8960/inventory/?limit=3&offset=3",
+    "previous": null,
+    "results": [
+        {
+            "id": 17,
+            "name": "Seinfeld Season 1 Episode 8",
+            "type": {
+                "id": 2,
+                "name": "Episode"
+            },
+            "language": {
+                "id": 37,
+                "name": "English"
+            },
+            "tags": [
+                {
+                    "id": 3,
+                    "name": "Comedy",
+
+$ curl -s 'http://127.0.0.1:8960/inventory/?limit=2&offset=15' | .venv/bin/python -m json.tool | head -8
+{
+    "count": 17,
+    "next": null,
+    "previous": "http://127.0.0.1:8960/inventory/?limit=2&offset=13",
+    "results": [
+        {
+            "id": 2,
+            "name": "The Matrix Reloaded",
+
+=============================================================================
+Challenge 8 -- create an inventory item through the API
+(this returned HTTP 400 for every payload before the fix)
+=============================================================================
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST 'http://127.0.0.1:8960/inventory/' -H 'Content-Type: application/json' -d '{"name":"Inception","type":1,"language":37,"tags":[6],"metadata":{"year":2010,"actors":["Leonardo DiCaprio","Joseph Gordon-Levitt"],"imdb_rating":8.8,"rotten_tomatoes_rating":87,"film_locations":["Paris, France","Tokyo, Japan"]}}' | .venv/bin/python -c 'import sys;d=sys.stdin.read();print(d)'
+{"id":18,"name":"Inception","type":{"id":1,"name":"Movie"},"language":{"id":37,"name":"English"},"tags":[{"id":6,"name":"Sci-Fi","is_active":true}],"metadata":{"year":2010,"actors":["Leonardo DiCaprio","Joseph Gordon-Levitt"],"imdb_rating":8.8,"rotten_tomatoes_rating":87,"film_locations":["Paris, France","Tokyo, Japan"]},"created_at":"2026-09-24T21:39:34.072248Z"}
+HTTP 201
+
+
+Metadata that does not match the registered schema is rejected before it
+reaches the database (note the misspelled key):
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST 'http://127.0.0.1:8960/inventory/' -H 'Content-Type: application/json' -d '{"name":"Typo","type":1,"language":37,"metadata":{"year":2010,"actors":["X"],"imdb_rating":8.8,"rotten_toamtoes_rating":87}}'
+{"metadata":[{"loc":["rotten_tomatoes_rating"],"msg":"field required","type":"value_error.missing"},{"loc":["rotten_toamtoes_rating"],"msg":"extra fields not permitted","type":"value_error.extra"}]}
+HTTP 400
+
+=============================================================================
+Challenge 1 -- inventory created after a given day
+=============================================================================
+$ curl -s 'http://127.0.0.1:8960/inventory/created-after/?created_after=2020-01-01' | .venv/bin/python -m json.tool | head -6
+{
+    "count": 18,
+    "next": "http://127.0.0.1:8960/inventory/created-after/?created_after=2020-01-01&limit=3&offset=3",
+    "previous": null,
+    "results": [
+        {
+
+$ curl -s -w '\nHTTP %{http_code}\n' 'http://127.0.0.1:8960/inventory/created-after/?created_after=last%20tuesday'
+{"created_after":"Expected an ISO-8601 date such as 2023-03-24, got 'last tuesday'."}
+HTTP 400
+
+=============================================================================
+Challenge 2 -- DeactivateOrderView
+=============================================================================
+$ curl -s 'http://127.0.0.1:8960/orders/1/' | .venv/bin/python -c 'import json,sys;d=json.load(sys.stdin);print(json.dumps({k:d[k] for k in ("id","start_date","embargo_date","is_active")},indent=2))'
+{
+  "id": 1,
+  "start_date": "2026-09-24",
+  "embargo_date": "2026-10-24",
+  "is_active": true
+}
+
+$ curl -s -X POST 'http://127.0.0.1:8960/orders/1/deactivate/' | .venv/bin/python -c 'import json,sys;d=json.load(sys.stdin);print(json.dumps({k:d[k] for k in ("id","is_active")},indent=2))'
+{
+  "id": 1,
+  "is_active": false
+}
+
+$ curl -s -X POST 'http://127.0.0.1:8960/orders/1/deactivate/' -H 'Content-Type: application/json' -d '{"is_active":true}' | .venv/bin/python -c 'import json,sys;d=json.load(sys.stdin);print(json.dumps({k:d[k] for k in ("id","is_active")},indent=2))'
+{
+  "id": 1,
+  "is_active": true
+}
+
+=============================================================================
+Challenge 3 -- orders inside a start/embargo window
+=============================================================================
+$ curl -s 'http://127.0.0.1:8960/orders/date-range/?start_date=2026-09-24&embargo_date=2026-11-23' | .venv/bin/python -c 'import json,sys;d=json.load(sys.stdin);print("count:",d["count"]);print(json.dumps([{k:o[k] for k in ("id","start_date","embargo_date")} for o in d["results"]],indent=2))'
+count: 4
+[
+  {
+    "id": 4,
+    "start_date": "2026-10-09",
+    "embargo_date": "2026-10-24"
+  },
+  {
+    "id": 5,
+    "start_date": "2026-10-09",
+    "embargo_date": "2026-10-24"
+  },
+  {
+    "id": 3,
+    "start_date": "2026-09-29",
+    "embargo_date": "2026-10-24"
+  },
+  {
+    "id": 1,
+    "start_date": "2026-09-24",
+    "embargo_date": "2026-10-24"
+  }
+]
+
+$ curl -s -w '\nHTTP %{http_code}\n' 'http://127.0.0.1:8960/orders/date-range/?start_date=2024-01-01'
+{"embargo_date":"This query parameter is required."}
+HTTP 400
+
+=============================================================================
+Challenge 6 -- tags on an order   |   Challenge 7 -- orders on a tag
+=============================================================================
+$ curl -s 'http://127.0.0.1:8960/orders/3/tags/' | .venv/bin/python -m json.tool
+{
+    "count": 4,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 6,
+            "name": "Boston",
+            "is_active": true
+        },
+        {
+            "id": 16,
+            "name": "QC",
+            "is_active": true
+        },
+        {
+            "id": 18,
+            "name": "Subbing",
+            "is_active": true
+        },
+        {
+            "id": 20,
+            "name": "Transcription",
+            "is_active": true
+        }
+    ]
+}
+
+$ curl -s 'http://127.0.0.1:8960/orders/tags/17/orders/' | .venv/bin/python -c 'import json,sys;d=json.load(sys.stdin);print("count:",d["count"]);print([o["inventory"]["name"] for o in d["results"]])'
+count: 4
+['Crash', 'The Matrix', 'The Lord of the Rings: The Fellowship of the Ring', 'The Lord of the Rings: The Two Towers']
+
+=============================================================================
+Error handling -- a missing id is a 404, not a 500
+=============================================================================
+$ curl -s -o /dev/null -w 'GET /inventory/999999/  -> HTTP %{http_code}\n' 'http://127.0.0.1:8960/inventory/999999/'
+GET /inventory/999999/  -> HTTP 404
+
+$ curl -s -o /dev/null -w 'GET /orders/999999/     -> HTTP %{http_code}\n' 'http://127.0.0.1:8960/orders/999999/'
+GET /orders/999999/     -> HTTP 404
+
+$ curl -s -o /dev/null -w 'POST /orders/999999/deactivate/ -> HTTP %{http_code}\n' -X POST 'http://127.0.0.1:8960/orders/999999/deactivate/'
+POST /orders/999999/deactivate/ -> HTTP 404
+
